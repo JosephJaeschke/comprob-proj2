@@ -2,7 +2,7 @@
 #include <cmath>
 #include <ctime>
 #include "pqp/include/PQP.h"
-#include "quaternion.h"
+#include "quaternion.hpp"
 
 #define INT_PARAM 0.5 //interpolation parameter
 

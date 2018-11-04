@@ -4,7 +4,7 @@
 #include <string>
 #include <cstring>
 #include "pqp/include/PQP.h"
-#include "quaternion.h"
+#include "quaternion.hpp"
 
 /*
  * Read trigles from txt file
