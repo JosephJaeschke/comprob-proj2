@@ -1,5 +1,6 @@
 #include <cstdlib>
 #include <cmath>
+#include "pqp/include/PQP.h"
 #include "quaternion.h"
 
 #define INT_PARAM 0.5 //interpolation parameter
@@ -68,14 +69,14 @@ quat Quat::slerp(quat q1, quat q2)
 
 }
 
-float** Quat::toMatrix(quat q)
+PQP_REAL** Quat::toMatrix(quat q)
 {
 	//return the rotation materix cooresponding to the given quaternion
-	float** matrix=new float*[3];
+	PQP_REAL** matrix=new PQP_REAL*[3];
 	int i;
 	for(i=0;i<3;i++)
 	{
-		matrix[i]=new float[3];
+		matrix[i]=new PQP_REAL[3];
 		int j;
 		for(j=0;j<3;j++)
 		{

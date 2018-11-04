@@ -14,6 +14,6 @@ namespace Quat
 	quat random();
 	float dist(quat,quat);
 	quat slerp(quat,quat);
-	float** toMatrix(quat);
+	PQP_REAL** toMatrix(quat);
 }
 #endif
