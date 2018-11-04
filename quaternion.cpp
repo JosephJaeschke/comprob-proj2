@@ -1,5 +1,6 @@
 #include <cstdlib>
 #include <cmath>
+#include <ctime>
 #include "pqp/include/PQP.h"
 #include "quaternion.h"
 
@@ -8,6 +9,7 @@
 quat Quat::random()
 {
 	//randomly generate a quaternion
+	srand(time(0));
 	float s=(((double)rand())/RAND_MAX);
 	float sigma1=sqrt(1-s);
 	float sigma2=sqrt(s);
@@ -69,30 +71,27 @@ quat Quat::slerp(quat q1, quat q2)
 
 }
 
-PQP_REAL** Quat::toMatrix(quat q)
+void Quat::toMatrix(quat q, PQP_REAL (*R)[3][3])
 {
-	//return the rotation materix cooresponding to the given quaternion
-	PQP_REAL** matrix=new PQP_REAL*[3];
+	//set the rotation matrix cooresponding to the given quaternion
 	int i;
 	for(i=0;i<3;i++)
 	{
-		matrix[i]=new PQP_REAL[3];
 		int j;
 		for(j=0;j<3;j++)
 		{
-			matrix[i][j]=0; //matrix[height][width]
+			(*R)[i][j]=0; //R[height][width]
 		}
 	}
-	matrix[0][0]=1-2*q.y*q.y-2*q.z*q.z;
-	matrix[0][1]=2*q.x*q.y-2*q.z*q.w;
-	matrix[0][2]=2*q.x*q.z+2*q.y*q.w;
-	matrix[1][0]=2*q.x*q.y+2*q.z*q.w;
-	matrix[1][1]=1-2*q.x*q.x-2*q.z*q.z;
-	matrix[1][2]=2*q.y*q.z-2*q.x*q.w;
-	matrix[2][0]=2*q.x*q.z-2*q.y*q.w;
-	matrix[2][1]=2*q.y*q.z-2*q.x*q.w;
-	matrix[2][2]=1-2*q.x*q.x-2*q.y*q.y;
-	return matrix;
+	(*R)[0][0]=1-2*q.y*q.y-2*q.z*q.z;
+	(*R)[0][1]=2*q.x*q.y-2*q.z*q.w;
+	(*R)[0][2]=2*q.x*q.z+2*q.y*q.w;
+	(*R)[1][0]=2*q.x*q.y+2*q.z*q.w;
+	(*R)[1][1]=1-2*q.x*q.x-2*q.z*q.z;
+	(*R)[1][2]=2*q.y*q.z-2*q.x*q.w;
+	(*R)[2][0]=2*q.x*q.z-2*q.y*q.w;
+	(*R)[2][1]=2*q.y*q.z-2*q.x*q.w;
+	(*R)[2][2]=1-2*q.x*q.x-2*q.y*q.y;
 }
 
 
