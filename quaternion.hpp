@@ -3,16 +3,16 @@
 
 typedef struct quaternion
 {
-	float w;
-	float x;
-	float y;
-	float z;
+	PQP_REAL w;
+	PQP_REAL x;
+	PQP_REAL y;
+	PQP_REAL z;
 } quat;
 
 namespace Quat
 {
 	quat random();
-	float dist(quat,quat);
+	float distance(quat,quat);
 	quat slerp(quat,quat);
 	void toMatrix(quat,PQP_REAL (*)[3][3]);
 }

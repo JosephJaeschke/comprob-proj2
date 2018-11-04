@@ -6,6 +6,41 @@
 #include "pqp/include/PQP.h"
 #include "quaternion.hpp"
 
+float MAX_X=10,MAX_Y=10,MAX_Z=10;
+float W_T=1, W_R=1;
+
+typedef struct configuration
+{
+	PQP_REAL x;
+	PQP_REAL y;
+	PQP_REAL z;
+	quat q;
+} config;
+
+/*
+	sample R^3 uniformly at random and sample a quaternion at random
+*/
+config sample()
+{
+	config c;
+	c.q=Quat::random();
+	c.x=(PQP_REAL)rand()/(PQP_REAL)(RAND_MAX/MAX_X);
+	c.y=(PQP_REAL)rand()/(PQP_REAL)(RAND_MAX/MAX_Y);
+	c.z=(PQP_REAL)rand()/(PQP_REAL)(RAND_MAX/MAX_Z);
+	return c;
+}
+
+/*
+	distance metric for SE(3)
+	weighted sum of translational distance and rotational distance
+*/
+float distance(config c1, config c2)
+{
+	float tDist=sqrt((c1.x-c2.x)*(c1.x-c2.x)+(c1.y-c2.y)*(c1.y-c2.y)+(c1.z-c2.z)*(c1.z-c2.z)); 
+	float rDist=Quat::distance(c1.q,c2.q);
+	return W_T*tDist+W_R*rDist;
+}
+
 /*
  * Read trigles from txt file
  * Build PQP model using trigles

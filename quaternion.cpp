@@ -23,7 +23,7 @@ quat Quat::random()
 	return q;
 }
 
-float Quat::dist(quat q1, quat q2)
+float Quat::distance(quat q1, quat q2)
 {
 	//compute distance between two quaternion
 	float lambda=(q1.w*q2.w)+(q1.x*q2.x)+(q1.y*q2.y)+(q1.z*q2.z);
@@ -74,15 +74,6 @@ quat Quat::slerp(quat q1, quat q2)
 void Quat::toMatrix(quat q, PQP_REAL (*R)[3][3])
 {
 	//set the rotation matrix cooresponding to the given quaternion
-	int i;
-	for(i=0;i<3;i++)
-	{
-		int j;
-		for(j=0;j<3;j++)
-		{
-			(*R)[i][j]=0; //R[height][width]
-		}
-	}
 	(*R)[0][0]=1-2*q.y*q.y-2*q.z*q.z;
 	(*R)[0][1]=2*q.x*q.y-2*q.z*q.w;
 	(*R)[0][2]=2*q.x*q.z+2*q.y*q.w;
@@ -93,21 +84,4 @@ void Quat::toMatrix(quat q, PQP_REAL (*R)[3][3])
 	(*R)[2][1]=2*q.y*q.z-2*q.x*q.w;
 	(*R)[2][2]=1-2*q.x*q.x-2*q.y*q.y;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
