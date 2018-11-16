@@ -4,8 +4,6 @@
 #include "pqp/include/PQP.h"
 #include "quaternion.hpp"
 
-#define INT_PARAM 0.5 //interpolation parameter
-
 quat Quat::random()
 {
 	//randomly generate a quaternion
@@ -31,9 +29,10 @@ float Quat::distance(quat q1, quat q2)
 	return 1-lambda; //distance in range [0,1] (0=same, 1=180^ apart)
 }
 
-quat Quat::slerp(quat q1, quat q2)
+quat Quat::slerp(quat q1, quat q2, float param)
 {
 	//interpolate two quaternions
+	//param is the fraction between the two quaternions
 	float lambda=(q1.w*q2.w)+(q1.x*q2.x)+(q1.y*q2.y)+(q1.z*q2.z);
 	if(lambda<0)
 	{
@@ -47,15 +46,15 @@ quat Quat::slerp(quat q1, quat q2)
 	if(lambda>0.9995)
 	{
 		//if they are too close, use linear interpolation
-		r=1-INT_PARAM;
-		s=INT_PARAM;
+		r=1-param;
+		s=param;
 	}
 	else
 	{
 		float alpha=acos(lambda);
 		float gamma=1/sin(alpha);
-		r=sin((1-INT_PARAM)*alpha)*gamma;
-		s=sin(INT_PARAM*alpha)*gamma;
+		r=sin((1-param)*alpha)*gamma;
+		s=sin(param*alpha)*gamma;
 	}
 	quat newQuat;
 	newQuat.w=r*q1.w+s*q2.w;

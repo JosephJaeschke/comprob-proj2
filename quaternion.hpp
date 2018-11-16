@@ -13,7 +13,7 @@ namespace Quat
 {
 	quat random();
 	float distance(quat,quat);
-	quat slerp(quat,quat);
+	quat slerp(quat,quat,float);
 	void toMatrix(quat,PQP_REAL (*)[3][3]);
 }
 #endif
