@@ -12,7 +12,7 @@
 #define PRM_ITR 200
 #define PRM_STAR_CONST 3.17132879986883333333
 #define CCH_RADIUS 2.0
-#define DELTA 0.01
+#define DELTA 0.0001
 
 using namespace std;
 
@@ -25,15 +25,31 @@ typedef struct configuration
 	PQP_REAL y;
 	PQP_REAL z;
 	quat q;
+	PQP_REAL px;
+	PQP_REAL py;
+	PQP_REAL pz;
+	quat pq;
 	double dist;
 } state;
-/*
+
+bool operator==(const state& s1, const state& s2)
+{
+	if(s1.x!=s2.x||s1.y!=s2.y||s1.z!=s2.z)
+	{
+		return false;
+	}
+	if(s1.q.w!=s2.q.w||s1.q.x!=s2.q.x||s1.q.y!=s2.q.y||s1.q.z!=s2.q.z)
+	{
+		return false;
+	}
+	return true;
+}
+
 typedef struct edgeBetween
 {
 		state s1;
 		state s2;
 } edge;
-*/
 
 typedef struct Node
 {
@@ -95,6 +111,11 @@ bool compState(const state& s1, const state& s2)
 	return s1.dist<s2.dist;
 }
 
+state* a_star()
+{
+	return NULL;
+}
+
 /*
 	The PRM algorithm using the connected component heursistic
 */
@@ -120,13 +141,14 @@ void prmcch(PQP_Model* piano, PQP_Model* room)
 		int j=0;
 		while(all_nodes[j].dist<CCH_RADIUS)
 		{
-//			if(a_star(all_nodes[j],newSample)!=NULL){
-			bool badPath=false;
-			double step=0;
-			state checkState;
-			//check for collision in rotation
-			while(step<1)
+			if(a_star()!=NULL)
 			{
+				bool badPath=false;
+				double step=0;
+				state checkState;
+				//check for collision in rotation
+				while(step<1)
+				{
 					checkState.x=all_nodes[j].x;
 					checkState.y=all_nodes[j].y;
 					checkState.z=all_nodes[j].z;
@@ -138,36 +160,37 @@ void prmcch(PQP_Model* piano, PQP_Model* room)
 						break;
 					}
 					step+=DELTA;
-			}
-			step=0;
-			//check for collision in translation
-			while(step<1)
-			{
-				checkState.x=step*newSample.x+(1-step)*all_nodes[j].x;
-				checkState.y=step*newSample.y+(1-step)*all_nodes[j].y;
-				checkState.z=step*newSample.z+(1-step)*all_nodes[j].z;
-				checkState.q=newSample.q;
-				int c=collision(piano,room,checkState);
-				if(c==1)
-				{
-					badPath=true;
-					break;
 				}
-				step+=DELTA;
+				step=0;
+				//check for collision in translation
+				while(step<1)
+				{
+					checkState.x=step*newSample.x+(1-step)*all_nodes[j].x;
+					checkState.y=step*newSample.y+(1-step)*all_nodes[j].y;
+					checkState.z=step*newSample.z+(1-step)*all_nodes[j].z;
+					checkState.q=newSample.q;
+					int c=collision(piano,room,checkState);
+					if(c==1)
+					{
+						badPath=true;
+						break;
+					}
+					step+=DELTA;
+				}
+				if(!badPath)
+				{
+					//collision free path between neighbor and new state
+					/*
+					edge newEdge;
+					newEdge.s1=nodes[j];
+					newEdge.s2=newSample;
+					edges.push_back(newEdge);
+					*/
+				}
 			}
-			if(!badPath)
-			{
-				//collision free path between neighbor and new state
-				/*
-				edge newEdge;
-				newEdge.s1=nodes[j];
-				newEdge.s2=newSample;
-				edges.push_back(newEdge);
-
-				*/
-			}
-		}//}
+		}
 	}
+	return;
 }
 
 /*
@@ -177,7 +200,7 @@ void prmk(PQP_Model* piano, PQP_Model* room, int k)
 {
 	//k is neighbor count
 	vector<state> all_nodes;
-	//vector<edge> edges;
+	vector<edge> edges;
 	for(int i=0;i<PRM_ITR;i++)
 	{
 		cout<<"-"<<i<<endl;
@@ -234,17 +257,13 @@ void prmk(PQP_Model* piano, PQP_Model* room, int k)
 			if(!badPath)
 			{
 				//collision free path between neighbor and new state
-				/*
 				edge newEdge;
-				newEdge.s1=nodes[j];
+				newEdge.s1=all_nodes[j];
 				newEdge.s2=newSample;
 				edges.push_back(newEdge);
-				*/
 			}
 		}
 	}
-	all_nodes.clear();
-	cout<<"FINISH MAP!!!"<<endl<<flush;
 	return;
 }
 
@@ -323,54 +342,12 @@ void prm_star(PQP_Model* piano, PQP_Model* room)
 			j++;
 		}
 	}
-}
-
-/*
- * Read trigles from txt file
- * Build PQP model using trigles
- * Return PQP model
- * */
-PQP_Model readmodel(string name)
-{
-    PQP_Model m;
-    m.BeginModel();
-    // read from model file
-    fstream infile;
-    string file_name = name + ".txt";
-    char file_name_char[file_name.size() + 1];
-    strcpy(file_name_char, file_name.c_str());
-    infile.open(file_name_char);
-    if(!infile)
-    {
-        cout<<"Wrong model name for collision checker"<<endl;
-        exit(EXIT_FAILURE);
-    }
-    int tri_num;
-    infile >> tri_num;
-    cout<<"number of triangles for "<<name<<": "<<tri_num<<endl;
-    for(int num=0; num<tri_num; num++)
-    {
-        PQP_REAL p[3][3];
-        for(int r=0; r<3; r++)
-        {
-            for(int c=0; c<3; c++)
-            {
-                double v;
-                infile>>v;
-                p[r][c] = v;
-            }
-        }
-        m.AddTri(p[0], p[1], p[2], num);
-    }
-    infile.close();
-    m.EndModel();
-    cout<<"model "<<name<<" loaded..."<<endl;
-    return m;
+	return;
 }
 
 int main()
 {
-    // create pqp model
+    // create room PQP model
     PQP_Model* room = new PQP_Model;
     room->BeginModel();
     // read from model file
@@ -404,6 +381,7 @@ int main()
     room->EndModel();
     cout<<"model room loaded..."<<endl;
  
+ 	//create piano PQP model
     PQP_Model* piano = new PQP_Model;
 	piano->BeginModel();
     // read from model file
@@ -433,10 +411,25 @@ int main()
         piano->AddTri(p[0], p[1], p[2], num);
     }
     infile.close();
-    room->EndModel();
+    piano->EndModel();
     cout<<"model piano loaded..."<<endl;
- 
-
+	/*
+    PQP_REAL roomT[3]; //room does not move
+	PQP_REAL roomR[3][3]; //set to identity matrix since room does not rotate
+	roomR[0][0]=1;
+	roomR[0][1]=0;
+	roomR[0][2]=0;
+	roomR[1][0]=0;
+	roomR[1][1]=1;
+	roomR[1][2]=0;
+	roomR[2][0]=0;
+	roomR[2][1]=0;
+	roomR[2][2]=1;
+	PQP_REAL T[3]={5.0,8.0,0.3};
+	PQP_CollideResult cres;
+    PQP_Collide(&cres, roomR, T, piano, roomR, roomT, room);
+	cout<<cres.Colliding()<<endl;
+*/
 	int input;
 	cout<<"\t(1) PRM connected component heuristic\n\
 	(2) PRM k-nearest neighbors\n\
