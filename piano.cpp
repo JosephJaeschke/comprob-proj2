@@ -11,13 +11,13 @@
 
 #define PRM_ITR 200
 #define PRM_STAR_CONST 3.17132879986883333333
+#define CCH_RADIUS 2.0
+#define DELTA 0.01
 
 using namespace std;
 
 float MAX_X=10,MAX_Y=10,MAX_Z=10;
 float W_T=1.0, W_R=1.0;
-
-
 
 typedef struct configuration
 {
@@ -48,10 +48,11 @@ typedef struct Node
 state sample()
 {
 	state s;
+	srand(time(0));
+	s.x=-10+((PQP_REAL)rand()/RAND_MAX)*20;
+	s.y=-10+((PQP_REAL)rand()/RAND_MAX)*20;
+	s.z=((PQP_REAL)rand()/RAND_MAX)*5;
 	s.q=Quat::random();
-	s.x=(PQP_REAL)rand()/(PQP_REAL)(RAND_MAX/MAX_X);
-	s.y=(PQP_REAL)rand()/(PQP_REAL)(RAND_MAX/MAX_Y);
-	s.z=(PQP_REAL)rand()/(PQP_REAL)(RAND_MAX/MAX_Z);
 	s.dist=0;
 	return s;
 }
@@ -94,11 +95,12 @@ bool compState(const state& s1, const state& s2)
 	return s1.dist<s2.dist;
 }
 
-void prmk(PQP_Model* piano, PQP_Model* room, int k)
+/*
+	The PRM algorithm using the connected component heursistic
+*/
+void prmcch(PQP_Model* piano, PQP_Model* room)
 {
-	//k is neighbor count
 	vector<state> all_nodes;
-	//vector<edge> edges;
 	for(int i=0;i<PRM_ITR;i++)
 	{
 		state newSample=sample();
@@ -107,17 +109,19 @@ void prmk(PQP_Model* piano, PQP_Model* room, int k)
 			//new state has a collision, so try again
 			newSample=sample();
 		}
+		all_nodes.push_back(newSample);
 		//find distances to every node wrt sample and order from least to greatest
 		for(vector<state>::iterator it=all_nodes.begin();it!=all_nodes.end();++it)
 		{
 			(*it).dist=stateDistance((*it),newSample);
 		}
 		sort(all_nodes.begin(),all_nodes.end(),compState);
-		//check paths from new sample to k neighbors
-		int edgesAdded=0;
-		for(int j=0;j<k;j++)
+		//check the neighborhood of the new sample
+		int j=0;
+		while(all_nodes[j].dist<CCH_RADIUS)
 		{
-			int badPath=0;
+//			if(a_star(all_nodes[j],newSample)!=NULL){
+			bool badPath=false;
 			double step=0;
 			state checkState;
 			//check for collision in rotation
@@ -130,10 +134,10 @@ void prmk(PQP_Model* piano, PQP_Model* room, int k)
 					int c=collision(piano,room,checkState);
 					if(c==1)
 					{
-						badPath=1;
+						badPath=true;
 						break;
 					}
-					step+=0.05;
+					step+=DELTA;
 			}
 			step=0;
 			//check for collision in translation
@@ -146,12 +150,88 @@ void prmk(PQP_Model* piano, PQP_Model* room, int k)
 				int c=collision(piano,room,checkState);
 				if(c==1)
 				{
-					badPath=1;
+					badPath=true;
 					break;
 				}
-				step+=0.05;
+				step+=DELTA;
 			}
-			if(badPath==0)
+			if(!badPath)
+			{
+				//collision free path between neighbor and new state
+				/*
+				edge newEdge;
+				newEdge.s1=nodes[j];
+				newEdge.s2=newSample;
+				edges.push_back(newEdge);
+
+				*/
+			}
+		}//}
+	}
+}
+
+/*
+	The PRM algorithm using k-nearest neighbors
+*/
+void prmk(PQP_Model* piano, PQP_Model* room, int k)
+{
+	//k is neighbor count
+	vector<state> all_nodes;
+	//vector<edge> edges;
+	for(int i=0;i<PRM_ITR;i++)
+	{
+		cout<<"-"<<i<<endl;
+		state newSample=sample();
+		while(collision(piano,room,newSample)!=0)
+		{
+			//new state has a collision, so try again
+			newSample=sample();
+		}
+		all_nodes.push_back(newSample);
+		//find distances to every node wrt sample and order from least to greatest
+		for(vector<state>::iterator it=all_nodes.begin();it!=all_nodes.end();++it)
+		{
+			(*it).dist=stateDistance((*it),newSample);
+		}
+		sort(all_nodes.begin(),all_nodes.end(),compState);
+		//check paths from new sample to k neighbors
+		for(int j=0;j<k;++j)
+		{
+			bool badPath=false;
+			double step=0;
+			state checkState;
+			//check for collision in rotation
+			while(step<1)
+			{
+					checkState.x=all_nodes[j].x;
+					checkState.y=all_nodes[j].y;
+					checkState.z=all_nodes[j].z;
+					checkState.q=Quat::slerp(all_nodes[j].q,newSample.q,step);
+					int c=collision(piano,room,checkState);
+					if(c==1)
+					{
+						badPath=true;
+						break;
+					}
+					step+=DELTA;
+			}
+			step=0;
+			//check for collision in translation
+			while(step<1)
+			{
+				checkState.x=step*newSample.x+(1-step)*all_nodes[j].x;
+				checkState.y=step*newSample.y+(1-step)*all_nodes[j].y;
+				checkState.z=step*newSample.z+(1-step)*all_nodes[j].z;
+				checkState.q=newSample.q;
+				int c=collision(piano,room,checkState);
+				if(c==1)
+				{
+					badPath=true;
+					break;
+				}
+				step+=DELTA;
+			}
+			if(!badPath)
 			{
 				//collision free path between neighbor and new state
 				/*
@@ -160,16 +240,17 @@ void prmk(PQP_Model* piano, PQP_Model* room, int k)
 				newEdge.s2=newSample;
 				edges.push_back(newEdge);
 				*/
-				edgesAdded++;
 			}
 		}
-		if(edgesAdded>0)
-		{
-			all_nodes.push_back(newSample);
-		}
 	}
+	all_nodes.clear();
+	cout<<"FINISH MAP!!!"<<endl<<flush;
+	return;
 }
 
+/*
+	The PRM algorithm for asymptotic optimallity
+*/
 void prm_star(PQP_Model* piano, PQP_Model* room)
 {
 	vector<state> all_nodes;
@@ -182,6 +263,7 @@ void prm_star(PQP_Model* piano, PQP_Model* room)
 			//new state has a collision, so try again
 			newSample=sample();
 		}
+		all_nodes.push_back(newSample);
 		//find distances to every node wrt sample and order from least to greatest
 		for(vector<state>::iterator it=all_nodes.begin();it!=all_nodes.end();++it)
 		{
@@ -189,11 +271,11 @@ void prm_star(PQP_Model* piano, PQP_Model* room)
 		}
 		sort(all_nodes.begin(),all_nodes.end(),compState);
 		//check paths from new sample to neighbors
-		int edgesAdded=0;
+		int edgesAdded=0,j=0;
 		int cap=ceil(PRM_STAR_CONST*log(all_nodes.size()));
-		for(int j=0;j<cap;j++)
+		while(edgesAdded<cap&&j<all_nodes.size())
 		{
-			int badPath=0;
+			bool badPath=false;
 			double step=0;
 			state checkState;
 			//check for collision in rotation
@@ -206,10 +288,10 @@ void prm_star(PQP_Model* piano, PQP_Model* room)
 					int c=collision(piano,room,checkState);
 					if(c==1)
 					{
-						badPath=1;
+						badPath=true;
 						break;
 					}
-					step+=0.05;
+					step+=DELTA;
 			}
 			step=0;
 			//check for collision in translation
@@ -222,12 +304,12 @@ void prm_star(PQP_Model* piano, PQP_Model* room)
 				int c=collision(piano,room,checkState);
 				if(c==1)
 				{
-					badPath=1;
+					badPath=true;
 					break;
 				}
-				step+=0.05;
+				step+=DELTA;
 			}
-			if(badPath==0)
+			if(!badPath)
 			{
 				//collision free path between neighbor and new state
 				/*
@@ -238,13 +320,9 @@ void prm_star(PQP_Model* piano, PQP_Model* room)
 				*/
 				edgesAdded++;
 			}
-		}
-		if(edgesAdded>0)
-		{
-			all_nodes.push_back(newSample);
+			j++;
 		}
 	}
-
 }
 
 /*
@@ -293,27 +371,100 @@ PQP_Model readmodel(string name)
 int main()
 {
     // create pqp model
-    PQP_Model m1 = readmodel("room");
-    PQP_Model m2 = readmodel("piano");
-    // define translation of model 1
-    PQP_REAL T1[3];
-    // define rotation of model 1
-    PQP_REAL R1[3][3];
-    for(int i=0; i<3; i++)
+    PQP_Model* room = new PQP_Model;
+    room->BeginModel();
+    // read from model file
+    fstream infile;
+    string file_name = "room.txt";
+    char file_name_char[file_name.size() + 1];
+    strcpy(file_name_char, file_name.c_str());
+    infile.open(file_name_char);
+    if(!infile)
     {
-        for(int j=0; j<3; j++)
+        cout<<"Wrong model name for collision checker"<<endl;
+        exit(EXIT_FAILURE);
+    }
+    int tri_num;
+    infile >> tri_num;
+    for(int num=0; num<tri_num; num++)
+    {
+        PQP_REAL p[3][3];
+        for(int r=0; r<3; r++)
         {
-            if(i==j)
+            for(int c=0; c<3; c++)
             {
-                R1[i][j] = 1;
-            }
-            else
-            {
-                R1[i][j] = 0;
+                double v;
+                infile>>v;
+                p[r][c] = v;
             }
         }
-        T1[i] = 0;
+        room->AddTri(p[0], p[1], p[2], num);
     }
-	quat q=Quat::random();
+    infile.close();
+    room->EndModel();
+    cout<<"model room loaded..."<<endl;
+ 
+    PQP_Model* piano = new PQP_Model;
+	piano->BeginModel();
+    // read from model file
+    file_name = "piano.txt";
+    file_name_char[file_name.size() + 1];
+    strcpy(file_name_char, file_name.c_str());
+    infile.open(file_name_char);
+    if(!infile)
+    {
+        cout<<"Wrong model name for collision checker"<<endl;
+        exit(EXIT_FAILURE);
+    }
+    tri_num;
+    infile >> tri_num;
+    for(int num=0; num<tri_num; num++)
+    {
+        PQP_REAL p[3][3];
+        for(int r=0; r<3; r++)
+        {
+            for(int c=0; c<3; c++)
+            {
+                double v;
+                infile>>v;
+                p[r][c] = v;
+            }
+        }
+        piano->AddTri(p[0], p[1], p[2], num);
+    }
+    infile.close();
+    room->EndModel();
+    cout<<"model piano loaded..."<<endl;
+ 
+
+	int input;
+	cout<<"\t(1) PRM connected component heuristic\n\
+	(2) PRM k-nearest neighbors\n\
+	(3) PRM*\n"<<endl;
+	cin>>input;
+	switch(input)
+	{
+		case 1:
+			cout<<"Starting PRM with connected components heuristic..."<<endl;
+			prmcch(piano,room);
+			break;
+		case 2:
+			int k;
+			cout<<"Enter k value: ";
+			cin>>k;
+			cout<<"Starting PRM with k-nearest neighbors..."<<endl;
+			prmk(piano,room,k);
+			break;
+		case 3:
+			cout<<"Starting PRM*..."<<endl;
+			prm_star(piano,room);
+			break;
+		default:
+			cout<<"ERROR: Bad input"<<endl;
+			return 1;
+	}
+	delete room;
+	delete piano;
+	cout<<"RETURNED"<<endl<<flush;
     return 0;
 }
