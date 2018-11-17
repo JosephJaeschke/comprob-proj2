@@ -5,15 +5,19 @@
 #include <cstring>
 #include <vector>
 #include <bits/stdc++.h>
+#include <math.h>
 #include "pqp/include/PQP.h"
 #include "quaternion.hpp"
 
 #define PRM_ITR 200
+#define PRM_STAR_CONST 3.17132879986883333333
 
 using namespace std;
 
 float MAX_X=10,MAX_Y=10,MAX_Z=10;
-float W_T=1, W_R=1;
+float W_T=1.0, W_R=1.0;
+
+
 
 typedef struct configuration
 {
@@ -23,12 +27,20 @@ typedef struct configuration
 	quat q;
 	double dist;
 } state;
-
+/*
 typedef struct edgeBetween
 {
 		state s1;
 		state s2;
 } edge;
+*/
+
+typedef struct Node
+{
+	state s;
+	state parent;
+	vector<state> children;
+} node;
 
 /*
 	sample SE(3) uniformly at random and sample a quaternion at random
@@ -85,8 +97,8 @@ bool compState(const state& s1, const state& s2)
 void prmk(PQP_Model* piano, PQP_Model* room, int k)
 {
 	//k is neighbor count
-	vector<state> nodes;
-	vector<edge> edges;
+	vector<state> all_nodes;
+	//vector<edge> edges;
 	for(int i=0;i<PRM_ITR;i++)
 	{
 		state newSample=sample();
@@ -95,53 +107,144 @@ void prmk(PQP_Model* piano, PQP_Model* room, int k)
 			//new state has a collision, so try again
 			newSample=sample();
 		}
-		vector<state> N;
 		//find distances to every node wrt sample and order from least to greatest
-		for(vector<state>::iterator it=nodes.begin();it!=nodes.end();++it)
+		for(vector<state>::iterator it=all_nodes.begin();it!=all_nodes.end();++it)
 		{
 			(*it).dist=stateDistance((*it),newSample);
 		}
-		sort(nodes.begin(),nodes.end(),compState);
+		sort(all_nodes.begin(),all_nodes.end(),compState);
 		//check paths from new sample to k neighbors
 		int edgesAdded=0;
 		for(int j=0;j<k;j++)
 		{
 			int badPath=0;
 			double step=0;
-			double gap=stateDistance(newSample,nodes[j]);
+			state checkState;
+			//check for collision in rotation
 			while(step<1)
 			{
-				state checkState;
-				checkState.x=step*newSample.x+(1-step)*nodes[j].x;
-				checkState.y=step*newSample.y+(1-step)*nodes[j].y;
-				checkState.z=step*newSample.z+(1-step)*nodes[j].z;
-				checkState.q.w=nodes[j].q.w;
-				checkState.q.x=nodes[j].q.x;
-				checkState.q.y=nodes[j].q.y;
-				checkState.q.z=nodes[j].q.z;
+					checkState.x=all_nodes[j].x;
+					checkState.y=all_nodes[j].y;
+					checkState.z=all_nodes[j].z;
+					checkState.q=Quat::slerp(all_nodes[j].q,newSample.q,step);
+					int c=collision(piano,room,checkState);
+					if(c==1)
+					{
+						badPath=1;
+						break;
+					}
+					step+=0.05;
+			}
+			step=0;
+			//check for collision in translation
+			while(step<1)
+			{
+				checkState.x=step*newSample.x+(1-step)*all_nodes[j].x;
+				checkState.y=step*newSample.y+(1-step)*all_nodes[j].y;
+				checkState.z=step*newSample.z+(1-step)*all_nodes[j].z;
+				checkState.q=newSample.q;
 				int c=collision(piano,room,checkState);
 				if(c==1)
 				{
 					badPath=1;
 					break;
 				}
-				step+=0.1;
+				step+=0.05;
 			}
 			if(badPath==0)
 			{
 				//collision free path between neighbor and new state
+				/*
 				edge newEdge;
 				newEdge.s1=nodes[j];
 				newEdge.s2=newSample;
 				edges.push_back(newEdge);
+				*/
 				edgesAdded++;
 			}
 		}
 		if(edgesAdded>0)
 		{
-			nodes.push_back(newSample);
+			all_nodes.push_back(newSample);
 		}
 	}
+}
+
+void prm_star(PQP_Model* piano, PQP_Model* room)
+{
+	vector<state> all_nodes;
+	//vector<edge> edges;
+	for(int i=0;i<PRM_ITR;i++)
+	{
+		state newSample=sample();
+		while(collision(piano,room,newSample)!=0)
+		{
+			//new state has a collision, so try again
+			newSample=sample();
+		}
+		//find distances to every node wrt sample and order from least to greatest
+		for(vector<state>::iterator it=all_nodes.begin();it!=all_nodes.end();++it)
+		{
+			(*it).dist=stateDistance((*it),newSample);
+		}
+		sort(all_nodes.begin(),all_nodes.end(),compState);
+		//check paths from new sample to neighbors
+		int edgesAdded=0;
+		int cap=ceil(PRM_STAR_CONST*log(all_nodes.size()));
+		for(int j=0;j<cap;j++)
+		{
+			int badPath=0;
+			double step=0;
+			state checkState;
+			//check for collision in rotation
+			while(step<1)
+			{
+					checkState.x=all_nodes[j].x;
+					checkState.y=all_nodes[j].y;
+					checkState.z=all_nodes[j].z;
+					checkState.q=Quat::slerp(all_nodes[j].q,newSample.q,step);
+					int c=collision(piano,room,checkState);
+					if(c==1)
+					{
+						badPath=1;
+						break;
+					}
+					step+=0.05;
+			}
+			step=0;
+			//check for collision in translation
+			while(step<1)
+			{
+				checkState.x=step*newSample.x+(1-step)*all_nodes[j].x;
+				checkState.y=step*newSample.y+(1-step)*all_nodes[j].y;
+				checkState.z=step*newSample.z+(1-step)*all_nodes[j].z;
+				checkState.q=newSample.q;
+				int c=collision(piano,room,checkState);
+				if(c==1)
+				{
+					badPath=1;
+					break;
+				}
+				step+=0.05;
+			}
+			if(badPath==0)
+			{
+				//collision free path between neighbor and new state
+				/*
+				edge newEdge;
+				newEdge.s1=nodes[j];
+				newEdge.s2=newSample;
+				edges.push_back(newEdge);
+				*/
+				edgesAdded++;
+			}
+		}
+		if(edgesAdded>0)
+		{
+			all_nodes.push_back(newSample);
+		}
+	}
+
 }
 
 /*
