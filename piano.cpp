@@ -6,6 +6,7 @@
 #include <vector>
 #include <bits/stdc++.h>
 #include <math.h>
+#include <float.h>
 #include "pqp/include/PQP.h"
 #include "quaternion.hpp"
 
@@ -29,6 +30,8 @@ typedef struct configuration
 	PQP_REAL py;
 	PQP_REAL pz;
 	quat pq;
+	double g;
+	double h;
 	double dist;
 } state;
 
@@ -69,6 +72,12 @@ state sample()
 	s.y=-10+((PQP_REAL)rand()/RAND_MAX)*20;
 	s.z=((PQP_REAL)rand()/RAND_MAX)*5;
 	s.q=Quat::random();
+	s.px=NAN;
+	s.py=NAN;
+	s.pz=NAN;
+	s.pq=Quat::random();
+	s.g=DBL_MAX;
+	s.h=DBL_MAX;
 	s.dist=0;
 	return s;
 }
@@ -106,14 +115,41 @@ int collision(PQP_Model* piano, PQP_Model* room,state newState)
     return cres.Colliding();
 }
 
-bool compState(const state& s1, const state& s2)
+bool compDist(const state& s1, const state& s2)
 {
 	return s1.dist<s2.dist;
 }
 
-state* a_star()
+bool a_starComp(const state& s1, const state& s2)
 {
-	return NULL;
+	return (s1.g+s1.h)<(s2.g+s2.h);
+}
+
+void setParent(state* child, state* parent)
+{
+	(*child).px=(*parent).x;
+	(*child).py=(*parent).y;
+	(*child).pz=(*parent).z;
+	(*child).pq=(*parent).q;
+	return;
+}
+
+vector<state> a_star(state start, state goal,vector<state>& nodes, vector<edge>& edges)
+{
+	start.g=0;
+	setParent(&start,&start);
+	vector<state> fringe;
+	fringe.push_back(start);
+	while(fringe.size()!=0)
+	{
+		state s=fringe[1];
+		fringe.erase(fringe.begin());
+		if(s==start)
+		{
+			return fringe;
+		}
+	}
+	return fringe;
 }
 
 /*
@@ -122,6 +158,21 @@ state* a_star()
 void prmcch(PQP_Model* piano, PQP_Model* room)
 {
 	vector<state> all_nodes;
+	vector<edge> edges;
+	state start=sample();
+	while(collision(piano,room,start)!=0)
+	{
+		//new state has a collision, so try again
+		start=sample();
+	}
+	state goal=sample();
+	while(collision(piano,room,goal)!=0)
+	{
+		//new state has a collision, so try again
+		goal=sample();
+	}
+	all_nodes.push_back(start);
+	all_nodes.push_back(goal);
 	for(int i=0;i<PRM_ITR;i++)
 	{
 		state newSample=sample();
@@ -136,12 +187,13 @@ void prmcch(PQP_Model* piano, PQP_Model* room)
 		{
 			(*it).dist=stateDistance((*it),newSample);
 		}
-		sort(all_nodes.begin(),all_nodes.end(),compState);
+		sort(all_nodes.begin(),all_nodes.end(),compDist);
 		//check the neighborhood of the new sample
 		int j=0;
 		while(all_nodes[j].dist<CCH_RADIUS)
 		{
-			if(a_star()!=NULL)
+			vector<state> path=a_star(start,all_nodes[j],all_nodes,edges);
+			if(path.size()==0)
 			{
 				bool badPath=false;
 				double step=0;
@@ -180,12 +232,10 @@ void prmcch(PQP_Model* piano, PQP_Model* room)
 				if(!badPath)
 				{
 					//collision free path between neighbor and new state
-					/*
 					edge newEdge;
-					newEdge.s1=nodes[j];
+					newEdge.s1=all_nodes[j];
 					newEdge.s2=newSample;
 					edges.push_back(newEdge);
-					*/
 				}
 			}
 		}
@@ -203,7 +253,6 @@ void prmk(PQP_Model* piano, PQP_Model* room, int k)
 	vector<edge> edges;
 	for(int i=0;i<PRM_ITR;i++)
 	{
-		cout<<"-"<<i<<endl;
 		state newSample=sample();
 		while(collision(piano,room,newSample)!=0)
 		{
@@ -216,7 +265,7 @@ void prmk(PQP_Model* piano, PQP_Model* room, int k)
 		{
 			(*it).dist=stateDistance((*it),newSample);
 		}
-		sort(all_nodes.begin(),all_nodes.end(),compState);
+		sort(all_nodes.begin(),all_nodes.end(),compDist);
 		//check paths from new sample to k neighbors
 		for(int j=0;j<k;++j)
 		{
@@ -273,7 +322,7 @@ void prmk(PQP_Model* piano, PQP_Model* room, int k)
 void prm_star(PQP_Model* piano, PQP_Model* room)
 {
 	vector<state> all_nodes;
-	//vector<edge> edges;
+	vector<edge> edges;
 	for(int i=0;i<PRM_ITR;i++)
 	{
 		state newSample=sample();
@@ -288,7 +337,7 @@ void prm_star(PQP_Model* piano, PQP_Model* room)
 		{
 			(*it).dist=stateDistance((*it),newSample);
 		}
-		sort(all_nodes.begin(),all_nodes.end(),compState);
+		sort(all_nodes.begin(),all_nodes.end(),compDist);
 		//check paths from new sample to neighbors
 		int edgesAdded=0,j=0;
 		int cap=ceil(PRM_STAR_CONST*log(all_nodes.size()));
@@ -331,12 +380,10 @@ void prm_star(PQP_Model* piano, PQP_Model* room)
 			if(!badPath)
 			{
 				//collision free path between neighbor and new state
-				/*
 				edge newEdge;
-				newEdge.s1=nodes[j];
+				newEdge.s1=all_nodes[j];
 				newEdge.s2=newSample;
 				edges.push_back(newEdge);
-				*/
 				edgesAdded++;
 			}
 			j++;
