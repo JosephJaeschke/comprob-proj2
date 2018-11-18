@@ -54,13 +54,6 @@ typedef struct edgeBetween
 		state s2;
 } edge;
 
-typedef struct Node
-{
-	state s;
-	state parent;
-	vector<state> children;
-} node;
-
 /*
 	sample SE(3) uniformly at random and sample a quaternion at random
 */
@@ -88,8 +81,8 @@ state sample()
 */
 double stateDistance(state c1, state c2)
 {
-	float tDist=sqrt((c1.x-c2.x)*(c1.x-c2.x)+(c1.y-c2.y)*(c1.y-c2.y)+(c1.z-c2.z)*(c1.z-c2.z)); 
-	float rDist=Quat::distance(c1.q,c2.q);
+	double tDist=sqrt((c1.x-c2.x)*(c1.x-c2.x)+(c1.y-c2.y)*(c1.y-c2.y)+(c1.z-c2.z)*(c1.z-c2.z)); 
+	double rDist=Quat::distance(c1.q,c2.q);
 	return W_T*tDist+W_R*rDist;
 }
 
@@ -134,19 +127,116 @@ void setParent(state* child, state* parent)
 	return;
 }
 
-vector<state> a_star(state start, state goal,vector<state>& nodes, vector<edge>& edges)
+vector<state> a_star(state start, state goal,vector<state> nodes, vector<edge> edges)
 {
 	start.g=0;
 	setParent(&start,&start);
 	vector<state> fringe;
+	vector<state> closed;
 	fringe.push_back(start);
 	while(fringe.size()!=0)
 	{
 		state s=fringe[1];
 		fringe.erase(fringe.begin());
-		if(s==start)
+		if(s==goal)
 		{
+			vector<state> path;
+			path.push_back(s);
+
 			return fringe;
+		}
+		closed.push_back(s);
+		for(int i=0;i<edges.size();i++)
+		{
+			if(edges[i].s1==s)
+			{
+				//succ is s2
+				state succ=edges[i].s2;
+				bool inClosed=false;
+				for(int j=0;j<closed.size();j++)
+				{
+					if(succ==closed[i])
+					{
+						inClosed=true;
+					}
+					if(!inClosed)
+					{
+						bool inFringe=false;
+						for(int k=0;k<fringe.size();k++)
+						{
+							if(succ==fringe[i])
+							{
+								inFringe=true;
+								break;
+							}
+							if(!inFringe)
+							{
+								succ.g=DBL_MAX;
+								succ.px=NAN;
+								succ.py=NAN;
+								succ.pz=NAN;
+							}
+							if(s.g+1<succ.g)
+							{
+								succ.g=s.g+1;
+								setParent(&succ,&s);
+								if(inFringe)
+								{
+									fringe.erase(fringe.begin()+k);									
+								}
+								succ.h=sqrt((s.x-succ.x)*(s.x-succ.x)+(s.y-succ.y)*(s.y-succ.y)+(s.z-succ.z)*(s.z-succ.z)); 
+								fringe.push_back(succ);
+								sort(fringe.begin(),fringe.end(),a_starComp);
+							}
+						}
+					}
+				}
+			}
+			else if(edges[i].s2==s)
+			{
+				//succ is s1
+				state succ=edges[i].s1;
+				bool inClosed=false;
+				for(int j=0;j<closed.size();j++)
+				{
+					if(succ==closed[i])
+					{
+						inClosed=true;
+					}
+					if(!inClosed)
+					{
+						bool inFringe=false;
+						for(int k=0;k<fringe.size();k++)
+						{
+							if(succ==fringe[i])
+							{
+								inFringe=true;
+								break;
+							}
+							if(!inFringe)
+							{
+								succ.g=DBL_MAX;
+								succ.px=NAN;
+								succ.py=NAN;
+								succ.pz=NAN;
+							}
+							if(s.g+1<succ.g)
+							{
+								succ.g=s.g+1;
+								setParent(&succ,&s);
+								if(inFringe)
+								{
+									fringe.erase(fringe.begin()+k);									
+								}
+								succ.h=sqrt((s.x-succ.x)*(s.x-succ.x)+(s.y-succ.y)*(s.y-succ.y)+(s.z-succ.z)*(s.z-succ.z)); 
+								fringe.push_back(succ);
+								sort(fringe.begin(),fringe.end(),a_starComp);
+							}
+						}
+					}
+				}
+
+			}
 		}
 	}
 	return fringe;
@@ -275,25 +365,32 @@ void prmk(PQP_Model* piano, PQP_Model* room, int k)
 			//check for collision in rotation
 			while(step<1)
 			{
-					checkState.x=all_nodes[j].x;
-					checkState.y=all_nodes[j].y;
-					checkState.z=all_nodes[j].z;
-					checkState.q=Quat::slerp(all_nodes[j].q,newSample.q,step);
-					int c=collision(piano,room,checkState);
-					if(c==1)
-					{
-						badPath=true;
-						break;
-					}
-					step+=DELTA;
+				checkState.x=all_nodes[j].x;
+				checkState.y=all_nodes[j].y;
+				checkState.z=all_nodes[j].z;
+				checkState.q=Quat::slerp(all_nodes[j].q,newSample.q,step);
+				int c=collision(piano,room,checkState);
+				if(c==1)
+				{
+					badPath=true;
+					break;
+				}
+				step+=DELTA;
 			}
 			step=0;
 			//check for collision in translation
-			while(step<1)
+			while(step<=1)
 			{
+				/*
 				checkState.x=step*newSample.x+(1-step)*all_nodes[j].x;
 				checkState.y=step*newSample.y+(1-step)*all_nodes[j].y;
 				checkState.z=step*newSample.z+(1-step)*all_nodes[j].z;
+				checkState.q=newSample.q;
+				int c=collision(piano,room,checkState);
+				*/
+				checkState.x=newSample.x+step*all_nodes[j].x;
+				checkState.y=newSample.y+step*all_nodes[j].y;
+				checkState.z=newSample.z+step*all_nodes[j].z;
 				checkState.q=newSample.q;
 				int c=collision(piano,room,checkState);
 				if(c==1)
@@ -365,9 +462,7 @@ void prm_star(PQP_Model* piano, PQP_Model* room)
 			//check for collision in translation
 			while(step<1)
 			{
-				checkState.x=step*newSample.x+(1-step)*all_nodes[j].x;
-				checkState.y=step*newSample.y+(1-step)*all_nodes[j].y;
-				checkState.z=step*newSample.z+(1-step)*all_nodes[j].z;
+	
 				checkState.q=newSample.q;
 				int c=collision(piano,room,checkState);
 				if(c==1)
