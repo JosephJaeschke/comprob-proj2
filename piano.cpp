@@ -61,9 +61,9 @@ typedef struct edgeBetween
 state sample()
 {
 	state s;
-	s.x=-1+((PQP_REAL)rand()/RAND_MAX)*11;
+	s.x=((PQP_REAL)rand()/RAND_MAX)*7.5;
 	s.y=((PQP_REAL)rand()/RAND_MAX)*10;
-	s.z=((PQP_REAL)rand()/RAND_MAX)*3.5;
+	s.z=((PQP_REAL)rand()/RAND_MAX)*10;
 	s.q=Quat::random();
 	s.px=DBL_MAX;
 	s.py=DBL_MAX;
@@ -143,28 +143,23 @@ vector<state> a_star(state start, state goal, vector<edge> edges)
 			cout<<"goal:"<<goal.x<<","<<goal.y<<","<<goal.z<<endl;
 			cout<<"s:"<<s.x<<","<<s.y<<","<<s.z<<endl;
 			cout<<"sp:"<<s.px<<","<<s.py<<","<<s.pz<<","<<s.pq.w<<endl;
-			cout<<closed.size()<<endl;
 			vector<state> path;
 			int a=0;
 			while(!(s.x==start.x&&s.y==start.y&&s.z==start.z))
 			{
-				state toFind;
-				toFind.x=s.px;
-				toFind.y=s.py;
-				toFind.z=s.pz;
-				toFind.q=s.pq;
-				path.push_back(s);
 				//check the closed list for the parent
 				for(a;a<closed.size();a++)
 				{
-					if(closed[a].x==toFind.x&&closed[a].y==toFind.y&&closed[a].z==toFind.z)
+					if(closed[a].x==s.px&&closed[a].y==s.py&&closed[a].z==s.pz)
 					{
-						s=toFind;
+						cout<<"yo"<<endl;
+						path.push_back(s);
+						s=closed[a];
+						a=0;
 						break;
 					}
 				}
 			}
-			cout<<s.x<<","<<s.y<<","<<s.z<<endl;
 			path.push_back(s);
 			vector<state> ret;
 			for(int i=path.size()-1;i>=0;--i)
@@ -442,6 +437,7 @@ void prmk(PQP_Model* piano, PQP_Model* room, int k)
 		start.q.y=0;
 		start.q.z=0;
 	}
+	cout<<"a"<<endl;
 	state goal=sample();
 	goal.z=0.3;
 	goal.q.w=0;
@@ -458,11 +454,13 @@ void prmk(PQP_Model* piano, PQP_Model* room, int k)
 		goal.q.y=0;
 		goal.q.z=0;
 	}
+	cout<<"b"<<endl;
 	all_nodes.push_back(start);
 	all_nodes.push_back(goal);
 	//do all the random sampling
 	for(int i=0;i<PRM_ITR;i++)
 	{
+		cout<<i<<endl;
 		state newSample=sample();
 		while(collision(piano,room,newSample)!=0)
 		{
@@ -470,10 +468,6 @@ void prmk(PQP_Model* piano, PQP_Model* room, int k)
 			newSample=sample();
 		}
 		all_nodes.push_back(newSample);
-	}
-	for(int i=0;i<all_nodes.size();i++)
-	{
-		state newSample=all_nodes[i];
 		//find distances to every node wrt sample and order from least to greatest
 		for(vector<state>::iterator it=all_nodes.begin();it!=all_nodes.end();++it)
 		{
@@ -699,7 +693,7 @@ void prm_star(PQP_Model* piano, PQP_Model* room)
 int main()
 {
 	cout<<"Starting C++..."<<endl;
-	//srand(time(0));
+	srand(time(NULL));
     // create room PQP model
     PQP_Model* room = new PQP_Model;
     room->BeginModel();

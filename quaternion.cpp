@@ -7,7 +7,6 @@
 quat Quat::random()
 {
 	//randomly generate a quaternion
-	srand(time(0));
 	float s=(((double)rand())/RAND_MAX);
 	float sigma1=sqrt(1-s);
 	float sigma2=sqrt(s);
