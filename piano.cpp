@@ -7,17 +7,18 @@
 #include <bits/stdc++.h>
 #include <math.h>
 #include <float.h>
+#include <algorithm>
 #include "pqp/include/PQP.h"
 #include "quaternion.hpp"
 
 #define PRM_ITR 200
 #define PRM_STAR_CONST 3.17132879986883333333
 #define CCH_RADIUS 2.0
-#define DELTA 0.0001
+#define DELTA 0.1
 
 using namespace std;
 
-float MAX_X=10,MAX_Y=10,MAX_Z=10;
+float MAX_X=10,MAX_Y=10,MAX_Z=5;
 float W_T=1.0, W_R=1.0;
 
 typedef struct configuration
@@ -60,14 +61,13 @@ typedef struct edgeBetween
 state sample()
 {
 	state s;
-	srand(time(0));
-	s.x=-10+((PQP_REAL)rand()/RAND_MAX)*20;
-	s.y=-10+((PQP_REAL)rand()/RAND_MAX)*20;
-	s.z=((PQP_REAL)rand()/RAND_MAX)*5;
+	s.x=-1+((PQP_REAL)rand()/RAND_MAX)*11;
+	s.y=((PQP_REAL)rand()/RAND_MAX)*10;
+	s.z=((PQP_REAL)rand()/RAND_MAX)*3.5;
 	s.q=Quat::random();
-	s.px=NAN;
-	s.py=NAN;
-	s.pz=NAN;
+	s.px=DBL_MAX;
+	s.py=DBL_MAX;
+	s.pz=DBL_MAX;
 	s.pq=Quat::random();
 	s.g=DBL_MAX;
 	s.h=DBL_MAX;
@@ -118,49 +118,61 @@ bool a_starComp(const state& s1, const state& s2)
 	return (s1.g+s1.h)<(s2.g+s2.h);
 }
 
-void setParent(state* child, state* parent)
-{
-	(*child).px=(*parent).x;
-	(*child).py=(*parent).y;
-	(*child).pz=(*parent).z;
-	(*child).pq=(*parent).q;
-	return;
-}
-
+/*
+	A* to find the shortest distance between two states on the roadmap
+*/
 vector<state> a_star(state start, state goal, vector<edge> edges)
 {
+	cout<<"Start A*..."<<endl;
+	cout<<start.x<<","<<start.y<<","<<start.z<<","<<start.q.w<<endl;
+	cout<<"---"<<endl;
+	cout<<goal.x<<","<<goal.y<<","<<goal.z<<endl;
+
 	start.g=0;
 	vector<state> fringe;
 	vector<state> closed;
 	fringe.push_back(start);
 	while(fringe.size()!=0)
 	{
-		state s=fringe[1];
+		state s=fringe[0];
 		fringe.erase(fringe.begin());
 		if(s==goal)
 		{
+			cout<<"[]"<<endl;
+			cout<<"start:"<<start.x<<","<<start.y<<","<<start.z<<endl;
+			cout<<"goal:"<<goal.x<<","<<goal.y<<","<<goal.z<<endl;
+			cout<<"s:"<<s.x<<","<<s.y<<","<<s.z<<endl;
+			cout<<"sp:"<<s.px<<","<<s.py<<","<<s.pz<<","<<s.pq.w<<endl;
+			cout<<closed.size()<<endl;
 			vector<state> path;
-			path.insert(path.begin(),s);
-			while(s.px!=s.px)
+			int a=0;
+			while(!(s.x==start.x&&s.y==start.y&&s.z==start.z))
 			{
 				state toFind;
 				toFind.x=s.px;
 				toFind.y=s.py;
 				toFind.z=s.pz;
 				toFind.q=s.pq;
+				path.push_back(s);
 				//check the closed list for the parent
-				for(int a=0;a<closed.size();a++)
+				for(a;a<closed.size();a++)
 				{
-					if(closed[a]==toFind)
+					if(closed[a].x==toFind.x&&closed[a].y==toFind.y&&closed[a].z==toFind.z)
 					{
-						path.insert(path.begin(),s);
 						s=toFind;
 						break;
 					}
 				}
 			}
-			path.insert(path.begin(),s);
-			return path;
+			cout<<s.x<<","<<s.y<<","<<s.z<<endl;
+			path.push_back(s);
+			vector<state> ret;
+			for(int i=path.size()-1;i>=0;--i)
+			{
+				ret.push_back(path[i]);
+			}
+			cout<<"End A* (path found)"<<endl;
+			return ret;
 		}
 		closed.push_back(s);
 		for(int i=0;i<edges.size();i++)
@@ -179,32 +191,36 @@ vector<state> a_star(state start, state goal, vector<edge> edges)
 					if(!inClosed)
 					{
 						bool inFringe=false;
-						for(int k=0;k<fringe.size();k++)
+						int k=0;
+						for(k;k<fringe.size();k++)
 						{
 							if(succ==fringe[i])
 							{
 								inFringe=true;
 								break;
 							}
-							if(!inFringe)
+						}
+						if(!inFringe)
+						{
+							succ.g=DBL_MAX;
+							succ.px=DBL_MAX;
+							succ.py=DBL_MAX;
+							succ.pz=DBL_MAX;
+						}
+						if(s.g+1<succ.g)
+						{
+							succ.g=s.g+1;
+							succ.px=s.x;
+							succ.py=s.y;
+							succ.pz=s.z;
+							succ.pq=s.q;
+							if(inFringe)
 							{
-								succ.g=DBL_MAX;
-								succ.px=NAN;
-								succ.py=NAN;
-								succ.pz=NAN;
+								fringe.erase(fringe.begin()+k);									
 							}
-							if(s.g+1<succ.g)
-							{
-								succ.g=s.g+1;
-								setParent(&succ,&s);
-								if(inFringe)
-								{
-									fringe.erase(fringe.begin()+k);									
-								}
-								succ.h=sqrt((s.x-succ.x)*(s.x-succ.x)+(s.y-succ.y)*(s.y-succ.y)+(s.z-succ.z)*(s.z-succ.z)); 
-								fringe.push_back(succ);
-								sort(fringe.begin(),fringe.end(),a_starComp);
-							}
+							succ.h=sqrt((goal.x-succ.x)*(goal.x-succ.x)+(goal.y-succ.y)*(goal.y-succ.y)+(goal.z-succ.z)*(goal.z-succ.z)); 
+							fringe.push_back(succ);
+							sort(fringe.begin(),fringe.end(),a_starComp);
 						}
 					}
 				}
@@ -223,32 +239,36 @@ vector<state> a_star(state start, state goal, vector<edge> edges)
 					if(!inClosed)
 					{
 						bool inFringe=false;
-						for(int k=0;k<fringe.size();k++)
+						int k=0;
+						for(k;k<fringe.size();k++)
 						{
 							if(succ==fringe[i])
 							{
 								inFringe=true;
 								break;
 							}
-							if(!inFringe)
+						}
+						if(!inFringe)
+						{
+							succ.g=DBL_MAX;
+							succ.px=DBL_MAX;
+							succ.py=DBL_MAX;
+							succ.pz=DBL_MAX;
+						}
+						if(s.g+1<succ.g)
+						{
+							succ.g=s.g+1;
+							succ.px=s.x;
+							succ.py=s.y;
+							succ.pz=s.z;
+							succ.pq=s.q;
+							if(inFringe)
 							{
-								succ.g=DBL_MAX;
-								succ.px=NAN;
-								succ.py=NAN;
-								succ.pz=NAN;
+								fringe.erase(fringe.begin()+k);									
 							}
-							if(s.g+1<succ.g)
-							{
-								succ.g=s.g+1;
-								setParent(&succ,&s);
-								if(inFringe)
-								{
-									fringe.erase(fringe.begin()+k);									
-								}
-								succ.h=sqrt((s.x-succ.x)*(s.x-succ.x)+(s.y-succ.y)*(s.y-succ.y)+(s.z-succ.z)*(s.z-succ.z)); 
-								fringe.push_back(succ);
-								sort(fringe.begin(),fringe.end(),a_starComp);
-							}
+							succ.h=sqrt((goal.x-succ.x)*(goal.x-succ.x)+(goal.y-succ.y)*(goal.y-succ.y)+(goal.z-succ.z)*(goal.z-succ.z)); 
+							fringe.push_back(succ);
+							sort(fringe.begin(),fringe.end(),a_starComp);
 						}
 					}
 				}
@@ -256,6 +276,7 @@ vector<state> a_star(state start, state goal, vector<edge> edges)
 			}
 		}
 	}
+	cout<<"End A* (no path)"<<endl;
 	return fringe;
 }
 
@@ -284,20 +305,21 @@ void prmcch(PQP_Model* piano, PQP_Model* room)
 	}
 	state goal=sample();
 	goal.z=0.3;
-	start.q.w=0;
-	start.q.x=0;
-	start.q.y=0;
-	start.q.z=0;
+	goal.q.w=0;
+	goal.q.x=0;
+	goal.q.y=0;
+	goal.q.z=0;
 	while(collision(piano,room,goal)!=0)
 	{
 		//new state has a collision, so try again
 		goal=sample();
 		goal.z=0.3;
-		start.q.w=0;
-		start.q.x=0;
-		start.q.y=0;
-		start.q.z=0;
+		goal.q.w=0;
+		goal.q.x=0;
+		goal.q.y=0;
+		goal.q.z=0;
 	}
+	cout<<"---"<<endl;
 	all_nodes.push_back(start);
 	all_nodes.push_back(goal);
 	for(int i=0;i<PRM_ITR;i++)
@@ -322,6 +344,7 @@ void prmcch(PQP_Model* piano, PQP_Model* room)
 			vector<state> path=a_star(start,all_nodes[j],edges);
 			if(path.size()==0)
 			{
+				//there is no path between these two states, so connect them
 				bool badPath=false;
 				double step=0;
 				state checkState;
@@ -341,16 +364,9 @@ void prmcch(PQP_Model* piano, PQP_Model* room)
 					step+=DELTA;
 				}
 				step=0;
-				//check for collision in translation
+				//check for collision in translation using parameterization of a line segment in 3D
 				while(step<=1)
 				{
-					/*
-					checkState.x=step*newSample.x+(1-step)*all_nodes[j].x;
-					checkState.y=step*newSample.y+(1-step)*all_nodes[j].y;
-					checkState.z=step*newSample.z+(1-step)*all_nodes[j].z;
-					checkState.q=newSample.q;
-					int c=collision(piano,room,checkState);
-					*/
 					checkState.x=newSample.x+step*(all_nodes[j].x-newSample.x);
 					checkState.y=newSample.y+step*(all_nodes[j].y-newSample.y);
 					checkState.z=newSample.z+step*(all_nodes[j].z-newSample.z);
@@ -374,6 +390,31 @@ void prmcch(PQP_Model* piano, PQP_Model* room)
 			}
 		}
 	}
+	vector<state> sPath=a_star(start,goal,edges);
+	remove("piano_states.txt");
+	ofstream fp;
+	fp.open("piano_states.txt");
+	for(int i=0;i<sPath.size();i++)
+	{
+		fp<<sPath[i].x;
+		fp<<",";
+		fp<<sPath[i].y;
+		fp<<",";
+		fp<<sPath[i].z;
+		fp<<",";
+		fp<<sPath[i].q.w;
+		fp<<",";
+		fp<<sPath[i].q.x;
+		fp<<",";
+		fp<<sPath[i].q.y;
+		fp<<",";
+		fp<<sPath[i].q.z;
+		if(i!=sPath.size()-1)
+		{
+			fp<<"|";
+		}
+	}
+	fp.close();
 	return;
 }
 
@@ -403,23 +444,23 @@ void prmk(PQP_Model* piano, PQP_Model* room, int k)
 	}
 	state goal=sample();
 	goal.z=0.3;
-	start.q.w=0;
-	start.q.x=0;
-	start.q.y=0;
-	start.q.z=0;
+	goal.q.w=0;
+	goal.q.x=0;
+	goal.q.y=0;
+	goal.q.z=0;
 	while(collision(piano,room,goal)!=0)
 	{
 		//new state has a collision, so try again
 		goal=sample();
 		goal.z=0.3;
-		start.q.w=0;
-		start.q.x=0;
-		start.q.y=0;
-		start.q.z=0;
+		goal.q.w=0;
+		goal.q.x=0;
+		goal.q.y=0;
+		goal.q.z=0;
 	}
 	all_nodes.push_back(start);
 	all_nodes.push_back(goal);
-
+	//do all the random sampling
 	for(int i=0;i<PRM_ITR;i++)
 	{
 		state newSample=sample();
@@ -429,6 +470,10 @@ void prmk(PQP_Model* piano, PQP_Model* room, int k)
 			newSample=sample();
 		}
 		all_nodes.push_back(newSample);
+	}
+	for(int i=0;i<all_nodes.size();i++)
+	{
+		state newSample=all_nodes[i];
 		//find distances to every node wrt sample and order from least to greatest
 		for(vector<state>::iterator it=all_nodes.begin();it!=all_nodes.end();++it)
 		{
@@ -436,7 +481,7 @@ void prmk(PQP_Model* piano, PQP_Model* room, int k)
 		}
 		sort(all_nodes.begin(),all_nodes.end(),compDist);
 		//check paths from new sample to k neighbors
-		for(int j=0;j<k;++j)
+		for(int j=1;j<k+1;j++)
 		{
 			bool badPath=false;
 			double step=0;
@@ -457,16 +502,9 @@ void prmk(PQP_Model* piano, PQP_Model* room, int k)
 				step+=DELTA;
 			}
 			step=0;
-			//check for collision in translation
+			//check for collision in translation using parameterization of a line segment in 3D
 			while(step<=1)
 			{
-				/*
-				checkState.x=step*newSample.x+(1-step)*all_nodes[j].x;
-				checkState.y=step*newSample.y+(1-step)*all_nodes[j].y;
-				checkState.z=step*newSample.z+(1-step)*all_nodes[j].z;
-				checkState.q=newSample.q;
-				int c=collision(piano,room,checkState);
-				*/
 				checkState.x=newSample.x+step*(all_nodes[j].x-newSample.x);
 				checkState.y=newSample.y+step*(all_nodes[j].y-newSample.y);
 				checkState.z=newSample.z+step*(all_nodes[j].z-newSample.z);
@@ -489,6 +527,36 @@ void prmk(PQP_Model* piano, PQP_Model* room, int k)
 			}
 		}
 	}
+	cout<<edges.size()<<endl;
+	vector<state> sPath=a_star(start,goal,edges);
+	if(start==goal)
+	{
+		cout<<"NO!"<<endl;
+	}
+	remove("piano_states.txt");
+	ofstream fp;
+	fp.open("piano_states.txt");
+	for(int i=0;i<sPath.size();i++)
+	{
+		fp<<sPath[i].x;
+		fp<<",";
+		fp<<sPath[i].y;
+		fp<<",";
+		fp<<sPath[i].z;
+		fp<<",";
+		fp<<sPath[i].q.w;
+		fp<<",";
+		fp<<sPath[i].q.x;
+		fp<<",";
+		fp<<sPath[i].q.y;
+		fp<<",";
+		fp<<sPath[i].q.z;
+		if(i!=sPath.size()-1)
+		{
+			fp<<"|";
+		}
+	}
+	fp.close();
 	return;
 }
 
@@ -573,7 +641,7 @@ void prm_star(PQP_Model* piano, PQP_Model* room)
 					step+=DELTA;
 			}
 			step=0;
-			//check for collision in translation
+			//check for collision in translation using parameterization of a line segment in 3D
 			while(step<=1)
 			{
 				checkState.x=newSample.x+step*(all_nodes[j].x-newSample.x);
@@ -600,11 +668,38 @@ void prm_star(PQP_Model* piano, PQP_Model* room)
 			j++;
 		}
 	}
+	vector<state> sPath=a_star(start,goal,edges);
+	remove("piano_states.txt");
+	ofstream fp;
+	fp.open("piano_states.txt");
+	for(int i=0;i<sPath.size();i++)
+	{
+		fp<<sPath[i].x;
+		fp<<",";
+		fp<<sPath[i].y;
+		fp<<",";
+		fp<<sPath[i].z;
+		fp<<",";
+		fp<<sPath[i].q.w;
+		fp<<",";
+		fp<<sPath[i].q.x;
+		fp<<",";
+		fp<<sPath[i].q.y;
+		fp<<",";
+		fp<<sPath[i].q.z;
+		if(i!=sPath.size()-1)
+		{
+			fp<<"|";
+		}
+	}
+	fp.close();
 	return;
 }
 
 int main()
 {
+	cout<<"Starting C++..."<<endl;
+	//srand(time(0));
     // create room PQP model
     PQP_Model* room = new PQP_Model;
     room->BeginModel();
@@ -671,23 +766,6 @@ int main()
     infile.close();
     piano->EndModel();
     cout<<"model piano loaded..."<<endl;
-	/*
-    PQP_REAL roomT[3]; //room does not move
-	PQP_REAL roomR[3][3]; //set to identity matrix since room does not rotate
-	roomR[0][0]=1;
-	roomR[0][1]=0;
-	roomR[0][2]=0;
-	roomR[1][0]=0;
-	roomR[1][1]=1;
-	roomR[1][2]=0;
-	roomR[2][0]=0;
-	roomR[2][1]=0;
-	roomR[2][2]=1;
-	PQP_REAL T[3]={5.0,8.0,0.3};
-	PQP_CollideResult cres;
-    PQP_Collide(&cres, roomR, T, piano, roomR, roomT, room);
-	cout<<cres.Colliding()<<endl;
-*/
 	int input;
 	cout<<"\t(1) PRM connected component heuristic\n\
 	(2) PRM k-nearest neighbors\n\
@@ -716,6 +794,6 @@ int main()
 	}
 	delete room;
 	delete piano;
-	cout<<"RETURNED"<<endl<<flush;
+	cout<<"Exiting C++"<<endl;
     return 0;
 }
