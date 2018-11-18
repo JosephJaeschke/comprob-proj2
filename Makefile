@@ -26,4 +26,4 @@ run: $(TARGET)
 
 clean:
 	/bin/rm -f $(CLEAN)
-
+	rm quaternion.o
