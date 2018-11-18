@@ -5,6 +5,7 @@ from gazebo_msgs.srv import SetModelState, SetModelStateRequest
 from gazebo_msgs.srv import GetModelState, GetModelStateRequest
 
 def rosMover():
+	fp=open('piano_states.txt','r');
 	service_list=rosservice.get_service_list()
 	print service_list
 	rospy.wait_for_service('/gazebo/get_model_state');
@@ -13,12 +14,24 @@ def rosMover():
 	rospy.wait_for_service('/gazebo/set_model_state')
 	print "finished waiting for setter service..."
 	set_model=rospy.ServiceProxy('/gazebo/set_model_state',SetModelState)
-	req=SetModelStateRequest()
-	req.model_state.model_name='piano2'
-	req.model_state.pose.position.x=4
-	req.model_state.pose.position.y=9
-	req.model_state.pose.position.z=2
-	set_model(req)
+	for line in fp:
+		line.strip()
+		states=line.split("|")
+		for s in states:
+			elements=s.split(",")
+			config=[float(e) for e in elements]
+			tx,ty,tz,rx,ry,rz,rw=config	
+			req=SetModelStateRequest()
+			req.model_state.model_name='piano2'
+			req.model_state.pose.position.x=tx
+			req.model_state.pose.position.y=ty
+			req.model_state.pose.position.z=tz
+			req.model_state.pose.orientation.x=rx
+			req.model_state.pose.orientation.y=ry
+			req.model_state.pose.orientation.z=rz
+			req.model_state.pose.orientation.w=rw
+			set_model(req)
+			time.sleep(1)
 	return
 
 def rosViewer():
