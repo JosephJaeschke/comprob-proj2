@@ -127,7 +127,7 @@ void setParent(state* child, state* parent)
 	return;
 }
 
-vector<state> a_star(state start, state goal,vector<state> nodes, vector<edge> edges)
+vector<state> a_star(state start, state goal, vector<edge> edges)
 {
 	start.g=0;
 	setParent(&start,&start);
@@ -142,7 +142,7 @@ vector<state> a_star(state start, state goal,vector<state> nodes, vector<edge> e
 		{
 			vector<state> path;
 			path.push_back(s);
-
+			
 			return fringe;
 		}
 		closed.push_back(s);
@@ -250,16 +250,36 @@ void prmcch(PQP_Model* piano, PQP_Model* room)
 	vector<state> all_nodes;
 	vector<edge> edges;
 	state start=sample();
+	start.z=0.3;
+	start.q.w=0;
+	start.q.x=0;
+	start.q.y=0;
+	start.q.z=0;
 	while(collision(piano,room,start)!=0)
 	{
 		//new state has a collision, so try again
 		start=sample();
+		start.z=0.3;
+		start.q.w=0;
+		start.q.x=0;
+		start.q.y=0;
+		start.q.z=0;
 	}
 	state goal=sample();
+	goal.z=0.3;
+	start.q.w=0;
+	start.q.x=0;
+	start.q.y=0;
+	start.q.z=0;
 	while(collision(piano,room,goal)!=0)
 	{
 		//new state has a collision, so try again
 		goal=sample();
+		goal.z=0.3;
+		start.q.w=0;
+		start.q.x=0;
+		start.q.y=0;
+		start.q.z=0;
 	}
 	all_nodes.push_back(start);
 	all_nodes.push_back(goal);
@@ -282,14 +302,14 @@ void prmcch(PQP_Model* piano, PQP_Model* room)
 		int j=0;
 		while(all_nodes[j].dist<CCH_RADIUS)
 		{
-			vector<state> path=a_star(start,all_nodes[j],all_nodes,edges);
+			vector<state> path=a_star(start,all_nodes[j],edges);
 			if(path.size()==0)
 			{
 				bool badPath=false;
 				double step=0;
 				state checkState;
 				//check for collision in rotation
-				while(step<1)
+				while(step<=1)
 				{
 					checkState.x=all_nodes[j].x;
 					checkState.y=all_nodes[j].y;
@@ -305,11 +325,18 @@ void prmcch(PQP_Model* piano, PQP_Model* room)
 				}
 				step=0;
 				//check for collision in translation
-				while(step<1)
+				while(step<=1)
 				{
+					/*
 					checkState.x=step*newSample.x+(1-step)*all_nodes[j].x;
 					checkState.y=step*newSample.y+(1-step)*all_nodes[j].y;
 					checkState.z=step*newSample.z+(1-step)*all_nodes[j].z;
+					checkState.q=newSample.q;
+					int c=collision(piano,room,checkState);
+					*/
+					checkState.x=newSample.x+step*(all_nodes[j].x-newSample.x);
+					checkState.y=newSample.y+step*(all_nodes[j].y-newSample.y);
+					checkState.z=newSample.z+step*(all_nodes[j].z-newSample.z);
 					checkState.q=newSample.q;
 					int c=collision(piano,room,checkState);
 					if(c==1)
@@ -335,12 +362,47 @@ void prmcch(PQP_Model* piano, PQP_Model* room)
 
 /*
 	The PRM algorithm using k-nearest neighbors
+	k parameter is the number of neighbors to check
 */
 void prmk(PQP_Model* piano, PQP_Model* room, int k)
 {
-	//k is neighbor count
 	vector<state> all_nodes;
 	vector<edge> edges;
+	state start=sample();
+	start.z=0.3;
+	start.q.w=0;
+	start.q.x=0;
+	start.q.y=0;
+	start.q.z=0;
+	while(collision(piano,room,start)!=0)
+	{
+		//new state has a collision, so try again
+		start=sample();
+		start.z=0.3;
+		start.q.w=0;
+		start.q.x=0;
+		start.q.y=0;
+		start.q.z=0;
+	}
+	state goal=sample();
+	goal.z=0.3;
+	start.q.w=0;
+	start.q.x=0;
+	start.q.y=0;
+	start.q.z=0;
+	while(collision(piano,room,goal)!=0)
+	{
+		//new state has a collision, so try again
+		goal=sample();
+		goal.z=0.3;
+		start.q.w=0;
+		start.q.x=0;
+		start.q.y=0;
+		start.q.z=0;
+	}
+	all_nodes.push_back(start);
+	all_nodes.push_back(goal);
+
 	for(int i=0;i<PRM_ITR;i++)
 	{
 		state newSample=sample();
@@ -363,7 +425,7 @@ void prmk(PQP_Model* piano, PQP_Model* room, int k)
 			double step=0;
 			state checkState;
 			//check for collision in rotation
-			while(step<1)
+			while(step<=1)
 			{
 				checkState.x=all_nodes[j].x;
 				checkState.y=all_nodes[j].y;
@@ -388,9 +450,9 @@ void prmk(PQP_Model* piano, PQP_Model* room, int k)
 				checkState.q=newSample.q;
 				int c=collision(piano,room,checkState);
 				*/
-				checkState.x=newSample.x+step*all_nodes[j].x;
-				checkState.y=newSample.y+step*all_nodes[j].y;
-				checkState.z=newSample.z+step*all_nodes[j].z;
+				checkState.x=newSample.x+step*(all_nodes[j].x-newSample.x);
+				checkState.y=newSample.y+step*(all_nodes[j].y-newSample.y);
+				checkState.z=newSample.z+step*(all_nodes[j].z-newSample.z);
 				checkState.q=newSample.q;
 				int c=collision(piano,room,checkState);
 				if(c==1)
@@ -420,6 +482,41 @@ void prm_star(PQP_Model* piano, PQP_Model* room)
 {
 	vector<state> all_nodes;
 	vector<edge> edges;
+	state start=sample();
+	start.z=0.3;
+	start.q.w=0;
+	start.q.x=0;
+	start.q.y=0;
+	start.q.z=0;
+	while(collision(piano,room,start)!=0)
+	{
+		//new state has a collision, so try again
+		start=sample();
+		start.z=0.3;
+		start.q.w=0;
+		start.q.x=0;
+		start.q.y=0;
+		start.q.z=0;
+	}
+	state goal=sample();
+	goal.z=0.3;
+	start.q.w=0;
+	start.q.x=0;
+	start.q.y=0;
+	start.q.z=0;
+	while(collision(piano,room,goal)!=0)
+	{
+		//new state has a collision, so try again
+		goal=sample();
+		goal.z=0.3;
+		start.q.w=0;
+		start.q.x=0;
+		start.q.y=0;
+		start.q.z=0;
+	}
+	all_nodes.push_back(start);
+	all_nodes.push_back(goal);
+
 	for(int i=0;i<PRM_ITR;i++)
 	{
 		state newSample=sample();
@@ -444,7 +541,7 @@ void prm_star(PQP_Model* piano, PQP_Model* room)
 			double step=0;
 			state checkState;
 			//check for collision in rotation
-			while(step<1)
+			while(step<=1)
 			{
 					checkState.x=all_nodes[j].x;
 					checkState.y=all_nodes[j].y;
@@ -460,9 +557,11 @@ void prm_star(PQP_Model* piano, PQP_Model* room)
 			}
 			step=0;
 			//check for collision in translation
-			while(step<1)
+			while(step<=1)
 			{
-	
+				checkState.x=newSample.x+step*(all_nodes[j].x-newSample.x);
+				checkState.y=newSample.y+step*(all_nodes[j].y-newSample.y);
+				checkState.z=newSample.z+step*(all_nodes[j].z-newSample.z);
 				checkState.q=newSample.q;
 				int c=collision(piano,room,checkState);
 				if(c==1)
