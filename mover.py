@@ -33,7 +33,6 @@ def rosViewer():
 		result=get_model_srv(model)
 		print '[',result.pose.position.x,',',result.pose.position.y,',',result.pose.position.z,']'
 		time.sleep(1)
-	
 
 if __name__=="__main__":
 	print "starting..."
