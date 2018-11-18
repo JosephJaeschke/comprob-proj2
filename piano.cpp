@@ -130,7 +130,6 @@ void setParent(state* child, state* parent)
 vector<state> a_star(state start, state goal, vector<edge> edges)
 {
 	start.g=0;
-	setParent(&start,&start);
 	vector<state> fringe;
 	vector<state> closed;
 	fringe.push_back(start);
@@ -141,9 +140,27 @@ vector<state> a_star(state start, state goal, vector<edge> edges)
 		if(s==goal)
 		{
 			vector<state> path;
-			path.push_back(s);
-			
-			return fringe;
+			path.insert(path.begin(),s);
+			while(s.px!=s.px)
+			{
+				state toFind;
+				toFind.x=s.px;
+				toFind.y=s.py;
+				toFind.z=s.pz;
+				toFind.q=s.pq;
+				//check the closed list for the parent
+				for(int a=0;a<closed.size();a++)
+				{
+					if(closed[a]==toFind)
+					{
+						path.insert(path.begin(),s);
+						s=toFind;
+						break;
+					}
+				}
+			}
+			path.insert(path.begin(),s);
+			return path;
 		}
 		closed.push_back(s);
 		for(int i=0;i<edges.size();i++)
