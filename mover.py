@@ -6,14 +6,12 @@ from gazebo_msgs.srv import GetModelState, GetModelStateRequest
 
 def rosMover():
 	fp=open('piano_states.txt','r');
-	service_list=rosservice.get_service_list()
-	print service_list
+	print "finished opening state file..."
 	rospy.wait_for_service('/gazebo/get_model_state');
-	print "finished waiting for getter service..."
-	get_model_srv=rospy.ServiceProxy('/gazebo/get_model_state',GetModelState)
 	rospy.wait_for_service('/gazebo/set_model_state')
 	print "finished waiting for setter service..."
 	set_model=rospy.ServiceProxy('/gazebo/set_model_state',SetModelState)
+	print "moving piano..."
 	for line in fp:
 		line.strip()
 		states=line.split("|")
@@ -32,6 +30,7 @@ def rosMover():
 			req.model_state.pose.orientation.w=rw
 			set_model(req)
 			time.sleep(1)
+	print "finsihed moving piano"
 	return
 
 def rosViewer():
