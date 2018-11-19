@@ -11,10 +11,10 @@
 #include "pqp/include/PQP.h"
 #include "quaternion.hpp"
 
-#define PRM_ITR 1000
+#define PRM_ITR 300
 #define PRM_STAR_CONST 3.17132879986883333333
 #define RADIUS 2.5
-#define DELTA 0.1
+#define DELTA 0.01
 
 using namespace std;
 
@@ -86,6 +86,16 @@ double stateDistance(state c1, state c2)
 	return W_T*tDist+W_R*rDist;
 }
 
+double pathCost(vector<state> path)
+{
+	double sum=0;
+	for(int i=1;i<path.size();i++)
+	{
+		sum+=stateDistance(path[i-1],path[i]);
+	}
+	return sum;
+}
+
 int collision(PQP_Model* piano, PQP_Model* room,state newState)
 {
 	PQP_REAL pianoR[3][3];
@@ -123,11 +133,14 @@ bool a_starComp(const state& s1, const state& s2)
 */
 vector<state> a_star(state start, state goal, vector<edge> edges)
 {
-	cout<<"Start A*..."<<endl;
 //	cout<<start.x<<","<<start.y<<","<<start.z<<","<<start.q.w<<endl;
 //	cout<<"---"<<endl;
 //	cout<<goal.x<<","<<goal.y<<","<<goal.z<<endl;
-
+	if(edges.size()==0)
+	{
+		vector<state> empty;
+		return empty;
+	}
 	start.g=0;
 	vector<state> fringe;
 	vector<state> closed;
@@ -165,7 +178,6 @@ vector<state> a_star(state start, state goal, vector<edge> edges)
 			{
 				ret.push_back(path[i]);
 			}
-			cout<<"End A* (path found)"<<endl;
 			return ret;
 		}
 		closed.push_back(s);
@@ -274,7 +286,6 @@ vector<state> a_star(state start, state goal, vector<edge> edges)
 			}
 		}
 	}
-	cout<<"End A* (no path)"<<endl;
 	return fringe;
 }
 
@@ -287,8 +298,6 @@ void prmcch(PQP_Model* piano, PQP_Model* room)
 	vector<edge> edges;
 	state start=sample();
 	start.z=0.3;
-	start.q.w=0;
-	start.q.x=0;
 	start.q.y=0;
 	start.q.z=0;
 	while(collision(piano,room,start)!=0)
@@ -296,15 +305,11 @@ void prmcch(PQP_Model* piano, PQP_Model* room)
 		//new state has a collision, so try again
 		start=sample();
 		start.z=0.3;
-		start.q.w=0;
-		start.q.x=0;
 		start.q.y=0;
 		start.q.z=0;
 	}
 	state goal=sample();
 	goal.z=0.3;
-	goal.q.w=0;
-	goal.q.x=0;
 	goal.q.y=0;
 	goal.q.z=0;
 	while(collision(piano,room,goal)!=0)
@@ -312,12 +317,9 @@ void prmcch(PQP_Model* piano, PQP_Model* room)
 		//new state has a collision, so try again
 		goal=sample();
 		goal.z=0.3;
-		goal.q.w=0;
-		goal.q.x=0;
 		goal.q.y=0;
 		goal.q.z=0;
 	}
-	cout<<"---"<<endl;
 	all_nodes.push_back(start);
 	all_nodes.push_back(goal);
 	for(int i=0;i<PRM_ITR;i++)
@@ -330,19 +332,18 @@ void prmcch(PQP_Model* piano, PQP_Model* room)
 		}
 		all_nodes.push_back(newSample);
 		//find distances to every node wrt sample and order from least to greatest
-		for(vector<state>::iterator it=all_nodes.begin();it!=all_nodes.end();++it)
+		for(int j=0;j<all_nodes.size();j++)
 		{
-			(*it).dist=stateDistance((*it),newSample);
+			all_nodes[j].dist=stateDistance(all_nodes[j],newSample);
 		}
 		sort(all_nodes.begin(),all_nodes.end(),compDist);
 		//check the neighborhood of the new sample
-		int j=0;
-		while(all_nodes[j].dist<RADIUS)
+		int j=1;
+		while(j<all_nodes.size()&&all_nodes[j].dist<RADIUS)
 		{
-			vector<state> path=a_star(start,all_nodes[j],edges);
+			vector<state> path=a_star(newSample,all_nodes[j],edges);
 			if(path.size()==0)
 			{
-				//there is no path between these two states, so connect them
 				bool badPath=false;
 				double step=0;
 				state checkState;
@@ -356,8 +357,9 @@ void prmcch(PQP_Model* piano, PQP_Model* room)
 					int c=collision(piano,room,checkState);
 					if(c==1)
 					{
-						badPath=true;
-						break;
+							//cout<<"bad rot"<<endl;
+							badPath=true;
+							break;
 					}
 					step+=DELTA;
 				}
@@ -372,6 +374,7 @@ void prmcch(PQP_Model* piano, PQP_Model* room)
 					int c=collision(piano,room,checkState);
 					if(c==1)
 					{
+						//cout<<"bad trans"<<endl;
 						badPath=true;
 						break;
 					}
@@ -386,9 +389,19 @@ void prmcch(PQP_Model* piano, PQP_Model* room)
 					edges.push_back(newEdge);
 				}
 			}
+			j++;
 		}
 	}
+	cout<<"Starting A*..."<<endl;
 	vector<state> sPath=a_star(start,goal,edges);
+	if(sPath.size()==0)
+	{
+		cout<<"End A* (no path)"<<endl;
+	}
+	else
+	{
+		cout<<"End A* (path found)"<<endl;
+	}
 	remove("piano_states.txt");
 	ofstream fp;
 	fp.open("piano_states.txt");
@@ -425,34 +438,26 @@ void prmk(PQP_Model* piano, PQP_Model* room, int k)
 	vector<state> all_nodes;
 	vector<edge> edges;
 	state start=sample();
-	//start.z=0.3;
-	start.q.w=0;
-	start.q.x=0;
+	start.z=0.3;
 	start.q.y=0;
 	start.q.z=0;
 	while(collision(piano,room,start)!=0)
 	{
 		//new state has a collision, so try again
 		start=sample();
-		//start.z=0.3;
-		start.q.w=0;
-		start.q.x=0;
+		start.z=0.3;
 		start.q.y=0;
 		start.q.z=0;
 	}
 	state goal=sample();
-	//goal.z=0.3;
-	goal.q.w=0;
-	goal.q.x=0;
+	goal.z=0.3;
 	goal.q.y=0;
 	goal.q.z=0;
 	while(collision(piano,room,goal)!=0)
 	{
 		//new state has a collision, so try again
 		goal=sample();
-		//goal.z=0.3;
-		goal.q.w=0;
-		goal.q.x=0;
+		goal.z=0.3;
 		goal.q.y=0;
 		goal.q.z=0;
 	}
@@ -475,15 +480,11 @@ void prmk(PQP_Model* piano, PQP_Model* room, int k)
 		}
 		sort(all_nodes.begin(),all_nodes.end(),compDist);
 		//check paths from new sample to k neighbors
-		for(int j=0;j<k;j++)
+		for(int j=1;j<k;j++)
 		{
 			if(j>=all_nodes.size())
 			{
 				break;
-			}
-			if(all_nodes[j].dist>RADIUS)
-			{
-				continue;
 			}
 			bool badPath=false;
 			double step=0;
@@ -529,7 +530,16 @@ void prmk(PQP_Model* piano, PQP_Model* room, int k)
 			}
 		}
 	}
+	cout<<"Starting A*..."<<endl;
 	vector<state> sPath=a_star(start,goal,edges);
+	if(sPath.size()==0)
+	{
+		cout<<"End A* (no path)"<<endl;
+	}
+	else
+	{
+		cout<<"End A* (path found)"<<endl;
+	}
 	remove("piano_states.txt");
 	ofstream fp;
 	fp.open("piano_states.txt");
@@ -566,8 +576,6 @@ void prm_star(PQP_Model* piano, PQP_Model* room)
 	vector<edge> edges;
 	state start=sample();
 	start.z=0.3;
-	start.q.w=0;
-	start.q.x=0;
 	start.q.y=0;
 	start.q.z=0;
 	while(collision(piano,room,start)!=0)
@@ -575,26 +583,20 @@ void prm_star(PQP_Model* piano, PQP_Model* room)
 		//new state has a collision, so try again
 		start=sample();
 		start.z=0.3;
-		start.q.w=0;
-		start.q.x=0;
 		start.q.y=0;
 		start.q.z=0;
 	}
 	state goal=sample();
 	goal.z=0.3;
-	start.q.w=0;
-	start.q.x=0;
-	start.q.y=0;
-	start.q.z=0;
+	goal.q.y=0;
+	goal.q.z=0;
 	while(collision(piano,room,goal)!=0)
 	{
 		//new state has a collision, so try again
 		goal=sample();
 		goal.z=0.3;
-		start.q.w=0;
-		start.q.x=0;
-		start.q.y=0;
-		start.q.z=0;
+		goal.q.y=0;
+		goal.q.z=0;
 	}
 	all_nodes.push_back(start);
 	all_nodes.push_back(goal);
@@ -615,7 +617,7 @@ void prm_star(PQP_Model* piano, PQP_Model* room)
 		}
 		sort(all_nodes.begin(),all_nodes.end(),compDist);
 		//check paths from new sample to neighbors
-		int edgesAdded=0,j=0;
+		int edgesAdded=0,j=1;
 		int cap=ceil(PRM_STAR_CONST*log(all_nodes.size()));
 		while(edgesAdded<cap&&j<all_nodes.size())
 		{
@@ -665,7 +667,16 @@ void prm_star(PQP_Model* piano, PQP_Model* room)
 			j++;
 		}
 	}
+	cout<<"Starting A*..."<<endl;
 	vector<state> sPath=a_star(start,goal,edges);
+	if(sPath.size()==0)
+	{
+		cout<<"End A* (no path)"<<endl;
+	}
+	else
+	{
+		cout<<"End A* (path found)"<<endl;
+	}
 	remove("piano_states.txt");
 	ofstream fp;
 	fp.open("piano_states.txt");
@@ -792,22 +803,32 @@ int main()
 	delete room;
 	delete piano;
 	cout<<"Exiting C++"<<endl;
-	/*
-	PQP_REAL roomT[3]; //room does not move
-	PQP_REAL roomR[3][3]; //set to identity matrix since room does not rotate
-	roomR[0][0]=1;
-	roomR[0][1]=0;
-	roomR[0][2]=0;
-	roomR[1][0]=0;
-	roomR[1][1]=1;
-	roomR[1][2]=0;
-	roomR[2][0]=0;
-	roomR[2][1]=0;
-	roomR[2][2]=1;
-	PQP_REAL T[3]={9,4,0.3};
-	PQP_CollideResult cres;
-    PQP_Collide(&cres, roomR, T, piano, roomR, roomT, room);
-	cout<<cres.Colliding()<<endl;
-	*/
-    return 0;
+	
+/*
+	//generate 50 random samples on the floor
+    vector<state> noCollide;
+	ofstream fp;
+	int count=0;
+	fp.open("piano_states.txt");
+	while(count<50)
+	{
+		cout<<count<<endl;
+		state s=sample();
+		s.z=0.3;
+		s.q.y=0;
+		s.q.z=0;
+		while(collision(piano,room,s)!=0)
+		{
+			//new state has a collision, so try again
+			s=sample();
+			s.z=0.3;
+			s.q.y=0;
+			s.q.z=0;
+		}
+		count++;
+		fp<<s.x<<","<<s.y<<","<<s.z<<","<<s.q.w<<","<<s.q.x<<","<<s.q.y<<","<<s.q.z<<"|";
+	}
+	fp.close();
+*/
+	return 0;
 }
