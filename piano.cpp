@@ -11,9 +11,9 @@
 #include "pqp/include/PQP.h"
 #include "quaternion.hpp"
 
-#define PRM_ITR 200
+#define PRM_ITR 1000
 #define PRM_STAR_CONST 3.17132879986883333333
-#define RADIUS 2.0
+#define RADIUS 2.5
 #define DELTA 0.1
 
 using namespace std;
@@ -124,9 +124,9 @@ bool a_starComp(const state& s1, const state& s2)
 vector<state> a_star(state start, state goal, vector<edge> edges)
 {
 	cout<<"Start A*..."<<endl;
-	cout<<start.x<<","<<start.y<<","<<start.z<<","<<start.q.w<<endl;
-	cout<<"---"<<endl;
-	cout<<goal.x<<","<<goal.y<<","<<goal.z<<endl;
+//	cout<<start.x<<","<<start.y<<","<<start.z<<","<<start.q.w<<endl;
+//	cout<<"---"<<endl;
+//	cout<<goal.x<<","<<goal.y<<","<<goal.z<<endl;
 
 	start.g=0;
 	vector<state> fringe;
@@ -138,11 +138,11 @@ vector<state> a_star(state start, state goal, vector<edge> edges)
 		fringe.erase(fringe.begin());
 		if(s==goal)
 		{
-			cout<<"[]"<<endl;
-			cout<<"start:"<<start.x<<","<<start.y<<","<<start.z<<endl;
-			cout<<"goal:"<<goal.x<<","<<goal.y<<","<<goal.z<<endl;
-			cout<<"s:"<<s.x<<","<<s.y<<","<<s.z<<endl;
-			cout<<"sp:"<<s.px<<","<<s.py<<","<<s.pz<<","<<s.pq.w<<endl;
+//			cout<<"[]"<<endl;
+//			cout<<"start:"<<start.x<<","<<start.y<<","<<start.z<<endl;
+//			cout<<"goal:"<<goal.x<<","<<goal.y<<","<<goal.z<<endl;
+//			cout<<"s:"<<s.x<<","<<s.y<<","<<s.z<<endl;
+//			cout<<"sp:"<<s.px<<","<<s.py<<","<<s.pz<<","<<s.pq.w<<endl;
 			vector<state> path;
 			int a=0;
 			while(!(s.x==start.x&&s.y==start.y&&s.z==start.z))
@@ -152,7 +152,6 @@ vector<state> a_star(state start, state goal, vector<edge> edges)
 				{
 					if(closed[a].x==s.px&&closed[a].y==s.py&&closed[a].z==s.pz)
 					{
-						cout<<"yo"<<endl;
 						path.push_back(s);
 						s=closed[a];
 						a=0;
@@ -530,12 +529,7 @@ void prmk(PQP_Model* piano, PQP_Model* room, int k)
 			}
 		}
 	}
-	cout<<edges.size()<<endl;
 	vector<state> sPath=a_star(start,goal,edges);
-	if(start==goal)
-	{
-		cout<<"NO!"<<endl;
-	}
 	remove("piano_states.txt");
 	ofstream fp;
 	fp.open("piano_states.txt");
