@@ -7,7 +7,6 @@ from gazebo_msgs.srv import GetModelState, GetModelStateRequest
 def rosMover():
 	fp=open('piano_states.txt','r');
 	print "Finished opening state file..."
-	rospy.wait_for_service('/gazebo/get_model_state');
 	rospy.wait_for_service('/gazebo/set_model_state')
 	print "Finished waiting for setter service..."
 	set_model=rospy.ServiceProxy('/gazebo/set_model_state',SetModelState)
